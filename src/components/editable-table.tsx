@@ -26,6 +26,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Edit3, Save, X, Plus, Trash2, Search } from "lucide-react";
 import { RichTextEditor, RichTextDisplay } from "./rich-text-editor";
 import { Employee, StatusFilter } from "@/types";
@@ -69,12 +79,25 @@ export default function EditableTable() {
   const [data, setData] = useState<Employee[]>(initialData);
   const [editingCell, setEditingCell] = useState<string | null>(null);
   const [editingValue, setEditingValue] = useState<string>("");
+
+  // Filter states
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("Semua");
+
+  // Delete confirmation states
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [employeeToDelete, setEmployeeToDelete] = useState<Employee | null>(
+    null
+  );
+
+  // Filtered data berdasarkan search dan status
   const filteredData = useMemo(() => {
     return data.filter((row) => {
+      // Filter berdasarkan status
       const matchesStatus =
         statusFilter === "Semua" || row.status === statusFilter;
+
+      // Filter berdasarkan search query (cari di semua field)
       const searchLower = searchQuery.toLowerCase();
       const matchesSearch =
         searchQuery === "" ||
@@ -114,8 +137,24 @@ export default function EditableTable() {
     setEditingValue("");
   };
 
-  const deleteRow = (id: number) => {
-    setData((prevData) => prevData.filter((row) => row.id !== id));
+  const handleDeleteClick = (employee: Employee) => {
+    setEmployeeToDelete(employee);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = () => {
+    if (employeeToDelete) {
+      setData((prevData) =>
+        prevData.filter((row) => row.id !== employeeToDelete.id)
+      );
+    }
+    setDeleteDialogOpen(false);
+    setEmployeeToDelete(null);
+  };
+
+  const cancelDelete = () => {
+    setDeleteDialogOpen(false);
+    setEmployeeToDelete(null);
   };
 
   const addNewRow = () => {
@@ -128,6 +167,20 @@ export default function EditableTable() {
       status: "Aktif",
     };
     setData([...data, newRow]);
+  };
+
+  const handleDirectSave = (
+    rowId: number,
+    field: keyof Employee,
+    newValue: string
+  ) => {
+    setData((prevData) =>
+      prevData.map((row) =>
+        row.id === rowId ? { ...row, [field]: newValue } : row
+      )
+    );
+    setEditingCell(null);
+    setEditingValue("");
   };
 
   const renderCell = (row: Employee, field: keyof Employee) => {
@@ -147,66 +200,48 @@ export default function EditableTable() {
         );
       } else if (field === "status") {
         return (
-          <div className="space-y-2 p-3 border rounded-lg bg-white shadow-sm">
-            <select
-              value={editingValue}
-              onChange={(e) => setEditingValue(e.target.value)}
-              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm"
-              autoFocus
-            >
-              <option value="Aktif">Aktif</option>
-              <option value="Cuti">Cuti</option>
-              <option value="Nonaktif">Nonaktif</option>
-            </select>
-            <div className="flex justify-end gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={cancelEdit}
-              >
-                <X className="h-4 w-4 mr-1" />
-                Batal
-              </Button>
-              <Button type="button" size="sm" onClick={saveEdit}>
-                <Save className="h-4 w-4 mr-1" />
-                Simpan
-              </Button>
-            </div>
-          </div>
+          <Select
+            value={editingValue}
+            onValueChange={(newValue) => {
+              handleDirectSave(row.id, field, newValue);
+            }}
+          >
+            <SelectTrigger className="w-full h-9">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="Aktif">Aktif</SelectItem>
+              <SelectItem value="Cuti">Cuti</SelectItem>
+              <SelectItem value="Nonaktif">Nonaktif</SelectItem>
+            </SelectContent>
+          </Select>
         );
       } else {
+        // Nama & Jabatan - inline edit langsung
         return (
-          <div className="space-y-2 p-3 border rounded-lg bg-white shadow-sm">
-            <Input
-              value={editingValue}
-              onChange={(e) => setEditingValue(e.target.value)}
-              className="w-full"
-              autoFocus
-              placeholder={
-                field === "nama" ? "Masukkan nama" : "Masukkan jabatan"
+          <Input
+            value={editingValue}
+            onChange={(e) => setEditingValue(e.target.value)}
+            className="h-9"
+            autoFocus
+            placeholder={
+              field === "nama" ? "Masukkan nama" : "Masukkan jabatan"
+            }
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                handleDirectSave(row.id, field, editingValue);
               }
-              onKeyDown={(e) => {
-                if (e.key === "Enter") saveEdit();
-                if (e.key === "Escape") cancelEdit();
-              }}
-            />
-            <div className="flex justify-end gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={cancelEdit}
-              >
-                <X className="h-4 w-4 mr-1" />
-                Batal
-              </Button>
-              <Button type="button" size="sm" onClick={saveEdit}>
-                <Save className="h-4 w-4 mr-1" />
-                Simpan
-              </Button>
-            </div>
-          </div>
+              if (e.key === "Escape") cancelEdit();
+            }}
+            onBlur={() => {
+              // Auto save on blur (kehilangan fokus)
+              if (editingValue !== value) {
+                handleDirectSave(row.id, field, editingValue);
+              } else {
+                cancelEdit();
+              }
+            }}
+          />
         );
       }
     }
@@ -255,7 +290,9 @@ export default function EditableTable() {
           </Button>
         </div>
 
+        {/* Filter Section */}
         <div className="flex flex-col sm:flex-row gap-4 pt-4 border-t">
+          {/* Search Input */}
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
             <Input
@@ -267,6 +304,7 @@ export default function EditableTable() {
             />
           </div>
 
+          {/* Status Filter Dropdown */}
           <Select
             value={statusFilter}
             onValueChange={(value) => setStatusFilter(value as StatusFilter)}
@@ -283,6 +321,7 @@ export default function EditableTable() {
           </Select>
         </div>
 
+        {/* Results Counter */}
         <div className="text-sm text-gray-600 mt-2">
           Menampilkan {filteredData.length} dari {data.length} data
         </div>
@@ -323,7 +362,7 @@ export default function EditableTable() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => deleteRow(row.id)}
+                        onClick={() => handleDeleteClick(row)}
                         className="text-red-600 hover:text-red-700 hover:bg-red-50"
                       >
                         <Trash2 className="h-4 w-4" />
@@ -358,6 +397,29 @@ export default function EditableTable() {
           </ul>
         </div>
       </CardContent>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Hapus Data Karyawan?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Apakah Anda yakin ingin menghapus data karyawan{" "}
+              <strong>{employeeToDelete?.nama}</strong>? Tindakan ini tidak
+              dapat dibatalkan.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={cancelDelete}>Batal</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+            >
+              Ya, Hapus
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }
