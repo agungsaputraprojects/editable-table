@@ -36,7 +36,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Edit3, Save, X, Plus, Trash2, Search } from "lucide-react";
+import { Edit3, Plus, Trash2, Search } from "lucide-react";
 import { RichTextEditor, RichTextDisplay } from "./rich-text-editor";
 import { Employee, StatusFilter } from "@/types";
 
