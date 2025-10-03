@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -36,294 +36,325 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Edit3, Plus, Trash2, Search } from "lucide-react";
-import { RichTextEditor, RichTextDisplay } from "./rich-text-editor";
-import { Employee, StatusFilter } from "@/types";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Plus,
+  Trash2,
+  Search,
+  RefreshCw,
+  AlertCircle,
+  Check,
+  ChevronsUpDown,
+} from "lucide-react";
+import {
+  fetchAssessmentSubjects,
+  fetchSubjects,
+  type AssessmentSubjectRecord,
+  type SubjectRecord,
+  type PageInfo,
+} from "@/lib/nocodb-api";
+import { cn } from "@/lib/utils";
 
-const initialData: Employee[] = [
-  {
-    id: 1,
-    nama: "John Doe",
-    jabatan: "Frontend Developer",
-    deskripsi:
-      "Berpengalaman dalam **React** dan *Next.js*\n• Mahir JavaScript ES6+\n• Familiar dengan TypeScript\n• Expert dalam [Tailwind CSS](https://tailwindcss.com)",
-    status: "Aktif",
-  },
-  {
-    id: 2,
-    nama: "Jane Smith",
-    jabatan: "UI/UX Designer",
-    deskripsi:
-      "Spesialis dalam *desain interface* yang user-friendly\n• Adobe Creative Suite\n• Figma & Sketch\n• Prototyping expert",
-    status: "Aktif",
-  },
-  {
-    id: 3,
-    nama: "Mike Johnson",
-    jabatan: "Backend Developer",
-    deskripsi:
-      "Expert dalam **Node.js** dan database\n• MongoDB & PostgreSQL\n• RESTful API design\n• Microservices architecture",
-    status: "Cuti",
-  },
-  {
-    id: 4,
-    nama: "Sarah Williams",
-    jabatan: "DevOps Engineer",
-    deskripsi:
-      "Berpengalaman dalam **CI/CD** pipeline\n• Docker & Kubernetes\n• AWS & Azure\n• Infrastructure as Code",
-    status: "Nonaktif",
-  },
-];
+interface DisplayData {
+  Id?: number;
+  Actual?: string;
+  Subject?: string;
+  SubjectId?: number;
+  Target?: string;
+}
+
+type StatusFilter = "All" | string;
 
 export default function EditableTable() {
-  const [data, setData] = useState<Employee[]>(initialData);
-  const [editingCell, setEditingCell] = useState<string | null>(null);
-  const [editingValue, setEditingValue] = useState<string>("");
+  const [data, setData] = useState<DisplayData[]>([]);
+  const [subjectOptions, setSubjectOptions] = useState<SubjectRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [pageInfo, setPageInfo] = useState<PageInfo | null>(null);
 
-  // Filter states
-  const [searchQuery, setSearchQuery] = useState<string>("");
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("Semua");
-
-  // Delete confirmation states
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [employeeToDelete, setEmployeeToDelete] = useState<Employee | null>(
+  const [openSubjectPopover, setOpenSubjectPopover] = useState<number | null>(
     null
   );
 
-  // Filtered data berdasarkan search dan status
+  const [searchQuery, setSearchQuery] = useState<string>("");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("All");
+
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState<DisplayData | null>(null);
+
+  // Fix: Add proper type annotation
+  const renderValue = (value: unknown): string => {
+    if (value === null || value === undefined) return "";
+    if (typeof value === "string") return value;
+    if (typeof value === "number") return String(value);
+    if (typeof value === "object") {
+      if (Array.isArray(value) && value.length > 0) {
+        const firstItem = value[0];
+        if (typeof firstItem === "object" && firstItem !== null) {
+          return (
+            ((firstItem as Record<string, unknown>).Title as string) ||
+            ((firstItem as Record<string, unknown>).title as string) ||
+            ""
+          );
+        }
+      }
+      const obj = value as Record<string, unknown>;
+      if (obj.Title) return obj.Title as string;
+      if (obj.title) return obj.title as string;
+    }
+    return String(value);
+  };
+
+  const fetchData = async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const subjectsResult = await fetchSubjects(0, 100);
+      console.log("Subjects for dropdown:", subjectsResult);
+      setSubjectOptions(subjectsResult.list || []);
+
+      const assessmentResult = await fetchAssessmentSubjects(0, 100);
+      console.log("Assessment Subjects:", assessmentResult);
+
+      const mappedData: DisplayData[] = (assessmentResult.list || []).map(
+        (item: AssessmentSubjectRecord) => {
+          const subjectValue = item.Subject;
+          let subjectTitle = "";
+          let subjectId: number | undefined;
+
+          if (Array.isArray(subjectValue) && subjectValue.length > 0) {
+            const firstSubject = subjectValue[0];
+            if (typeof firstSubject === "object" && firstSubject !== null) {
+              subjectTitle =
+                ((firstSubject as Record<string, unknown>).Title as string) ||
+                "";
+              subjectId = (firstSubject as Record<string, unknown>)
+                .Id as number;
+            }
+          } else if (subjectValue && typeof subjectValue === "object") {
+            const subjectObj = subjectValue as Record<string, unknown>;
+            subjectTitle = (subjectObj.Title as string) || "";
+            subjectId = subjectObj.Id as number;
+          }
+
+          return {
+            Id: item.Id,
+            Actual: renderValue(item.Actual),
+            Subject: subjectTitle,
+            SubjectId: subjectId,
+            Target: renderValue(item.Target),
+          };
+        }
+      );
+
+      setData(mappedData);
+      setPageInfo(assessmentResult.pageInfo || null);
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to fetch data";
+      setError(errorMessage);
+      console.error("Error fetching data:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
   const filteredData = useMemo(() => {
     return data.filter((row) => {
-      // Filter berdasarkan status
       const matchesStatus =
-        statusFilter === "Semua" || row.status === statusFilter;
-
-      // Filter berdasarkan search query (cari di semua field)
+        statusFilter === "All" || row.Actual === statusFilter;
       const searchLower = searchQuery.toLowerCase();
       const matchesSearch =
         searchQuery === "" ||
-        row.nama.toLowerCase().includes(searchLower) ||
-        row.jabatan.toLowerCase().includes(searchLower) ||
-        row.deskripsi.toLowerCase().includes(searchLower) ||
-        row.status.toLowerCase().includes(searchLower);
+        (row.Subject && row.Subject.toLowerCase().includes(searchLower)) ||
+        (row.Actual && row.Actual.toLowerCase().includes(searchLower)) ||
+        (row.Target && row.Target.toLowerCase().includes(searchLower));
 
       return matchesStatus && matchesSearch;
     });
   }, [data, searchQuery, statusFilter]);
 
-  const startEdit = (
-    rowId: number,
-    field: keyof Employee,
-    currentValue: string
-  ) => {
-    setEditingCell(`${rowId}-${field}`);
-    setEditingValue(currentValue);
-  };
+  const actualValues = useMemo(() => {
+    const values = new Set(
+      data
+        .map((row) => row.Actual)
+        .filter((value): value is string => Boolean(value) && value !== "")
+    );
+    return Array.from(values);
+  }, [data]);
 
-  const saveEdit = () => {
-    if (editingCell) {
-      const [rowId, field] = editingCell.split("-");
-      setData((prevData) =>
-        prevData.map((row) =>
-          row.id === parseInt(rowId) ? { ...row, [field]: editingValue } : row
-        )
-      );
-    }
-    setEditingCell(null);
-    setEditingValue("");
-  };
-
-  const cancelEdit = () => {
-    setEditingCell(null);
-    setEditingValue("");
-  };
-
-  const handleDeleteClick = (employee: Employee) => {
-    setEmployeeToDelete(employee);
+  const handleDeleteClick = (item: DisplayData) => {
+    setItemToDelete(item);
     setDeleteDialogOpen(true);
   };
 
   const confirmDelete = () => {
-    if (employeeToDelete) {
+    if (itemToDelete) {
       setData((prevData) =>
-        prevData.filter((row) => row.id !== employeeToDelete.id)
+        prevData.filter((row) => row.Id !== itemToDelete.Id)
       );
     }
     setDeleteDialogOpen(false);
-    setEmployeeToDelete(null);
+    setItemToDelete(null);
   };
 
   const cancelDelete = () => {
     setDeleteDialogOpen(false);
-    setEmployeeToDelete(null);
+    setItemToDelete(null);
   };
 
   const addNewRow = () => {
-    const newId = data.length > 0 ? Math.max(...data.map((d) => d.id)) + 1 : 1;
-    const newRow: Employee = {
-      id: newId,
-      nama: "Nama Baru",
-      jabatan: "Jabatan",
-      deskripsi: "Deskripsi pekerjaan...",
-      status: "Aktif",
+    const newId =
+      data.length > 0 ? Math.max(...data.map((d) => d.Id || 0)) + 1 : 1;
+    const newRow: DisplayData = {
+      Id: newId,
+      Actual: "A",
+      Subject: "",
+      Target: "",
     };
     setData([...data, newRow]);
   };
 
-  const handleDirectSave = (
-    rowId: number,
-    field: keyof Employee,
-    newValue: string
-  ) => {
+  const handleActualChange = (rowId: number, newValue: string) => {
     setData((prevData) =>
       prevData.map((row) =>
-        row.id === rowId ? { ...row, [field]: newValue } : row
+        row.Id === rowId ? { ...row, Actual: newValue } : row
       )
     );
-    setEditingCell(null);
-    setEditingValue("");
   };
 
-  const renderCell = (row: Employee, field: keyof Employee) => {
-    const cellId = `${row.id}-${field}`;
-    const isEditing = editingCell === cellId;
-    const value = String(row[field]);
+  const handleSubjectChange = (rowId: number, subjectId: number) => {
+    const selectedSubject = subjectOptions.find((s) => s.Id === subjectId);
 
-    if (isEditing) {
-      if (field === "deskripsi") {
-        return (
-          <RichTextEditor
-            value={editingValue}
-            onChange={setEditingValue}
-            onSave={saveEdit}
-            onCancel={cancelEdit}
-          />
-        );
-      } else if (field === "status") {
-        return (
-          <Select
-            value={editingValue}
-            onValueChange={(newValue) => {
-              handleDirectSave(row.id, field, newValue);
-            }}
-          >
-            <SelectTrigger className="w-full h-9">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="Aktif">Aktif</SelectItem>
-              <SelectItem value="Cuti">Cuti</SelectItem>
-              <SelectItem value="Nonaktif">Nonaktif</SelectItem>
-            </SelectContent>
-          </Select>
-        );
-      } else {
-        // Nama & Jabatan - inline edit langsung
-        return (
-          <Input
-            value={editingValue}
-            onChange={(e) => setEditingValue(e.target.value)}
-            className="h-9"
-            autoFocus
-            placeholder={
-              field === "nama" ? "Masukkan nama" : "Masukkan jabatan"
-            }
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                handleDirectSave(row.id, field, editingValue);
+    if (selectedSubject) {
+      setData((prevData) =>
+        prevData.map((row) =>
+          row.Id === rowId
+            ? {
+                ...row,
+                Subject: selectedSubject.Title || "",
+                SubjectId: selectedSubject.Id,
+                Target: selectedSubject.Target || "",
               }
-              if (e.key === "Escape") cancelEdit();
-            }}
-            onBlur={() => {
-              // Auto save on blur (kehilangan fokus)
-              if (editingValue !== value) {
-                handleDirectSave(row.id, field, editingValue);
-              } else {
-                cancelEdit();
-              }
-            }}
-          />
-        );
-      }
+            : row
+        )
+      );
     }
 
-    return (
-      <div
-        className="cursor-pointer hover:bg-gray-50 rounded p-2 min-h-[40px] flex items-center group transition-colors"
-        onClick={() => startEdit(row.id, field, value)}
-      >
-        {field === "deskripsi" ? (
-          <RichTextDisplay content={value} />
-        ) : field === "status" ? (
-          <Badge
-            variant={
-              value === "Aktif"
-                ? "default"
-                : value === "Cuti"
-                ? "secondary"
-                : "outline"
-            }
-          >
-            {value}
-          </Badge>
-        ) : (
-          <span className="text-sm">{value}</span>
-        )}
-        <Edit3 className="h-4 w-4 ml-2 opacity-0 group-hover:opacity-50 transition-opacity" />
-      </div>
-    );
+    setOpenSubjectPopover(null);
   };
+
+  if (loading) {
+    return (
+      <Card className="w-full">
+        <CardContent className="py-12">
+          <div className="flex flex-col items-center justify-center gap-4">
+            <RefreshCw className="h-8 w-8 animate-spin text-blue-600" />
+            <p className="text-gray-600">Loading data from NocoDB...</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (error) {
+    return (
+      <Card className="w-full">
+        <CardContent className="py-12">
+          <div className="flex flex-col items-center justify-center gap-4">
+            <AlertCircle className="h-12 w-12 text-red-600" />
+            <div className="text-center">
+              <p className="text-lg font-semibold text-gray-900 mb-2">
+                Error Loading Data
+              </p>
+              <p className="text-gray-600 mb-4">{error}</p>
+              <Button onClick={fetchData}>
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Retry
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card className="w-full">
       <CardHeader>
         <div className="flex justify-between items-start mb-4">
           <div>
-            <CardTitle>Data Karyawan</CardTitle>
+            <CardTitle>Assessment Subject Data</CardTitle>
             <CardDescription>
-              Klik pada sel untuk mengedit. Kolom deskripsi mendukung rich text
-              formatting.
+              Click on cells to edit. Target auto-fills based on Subject
+              selection.
             </CardDescription>
           </div>
-          <Button onClick={addNewRow} className="flex items-center gap-2">
-            <Plus className="h-4 w-4" />
-            Tambah Data
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              onClick={fetchData}
+              variant="outline"
+              className="flex items-center gap-2"
+            >
+              <RefreshCw className="h-4 w-4" />
+              Refresh
+            </Button>
+            <Button onClick={addNewRow} className="flex items-center gap-2">
+              <Plus className="h-4 w-4" />
+              Add New
+            </Button>
+          </div>
         </div>
 
-        {/* Filter Section */}
         <div className="flex flex-col sm:flex-row gap-4 pt-4 border-t">
-          {/* Search Input */}
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
             <Input
               type="text"
-              placeholder="Cari nama, jabatan, deskripsi, atau status..."
+              placeholder="Search Subject, Actual, or Target..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-10"
             />
           </div>
 
-          {/* Status Filter Dropdown */}
-          <Select
-            value={statusFilter}
-            onValueChange={(value) => setStatusFilter(value as StatusFilter)}
-          >
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger className="w-full sm:w-[200px]">
-              <SelectValue placeholder="Filter Status" />
+              <SelectValue placeholder="Filter Actual" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="Semua">Semua Status</SelectItem>
-              <SelectItem value="Aktif">Aktif</SelectItem>
-              <SelectItem value="Cuti">Cuti</SelectItem>
-              <SelectItem value="Nonaktif">Nonaktif</SelectItem>
+              <SelectItem value="All">All Actual</SelectItem>
+              {actualValues.map((value) => (
+                <SelectItem key={value} value={value}>
+                  {value}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
 
-        {/* Results Counter */}
-        <div className="text-sm text-gray-600 mt-2">
-          Menampilkan {filteredData.length} dari {data.length} data
+        <div className="flex justify-between items-center text-sm text-gray-600 mt-2">
+          <span>
+            Showing {filteredData.length} of {data.length} records
+          </span>
+          {pageInfo && <span>Total in database: {pageInfo.totalRows}</span>}
         </div>
       </CardHeader>
 
@@ -332,11 +363,11 @@ export default function EditableTable() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[150px]">Nama</TableHead>
-                <TableHead className="w-[200px]">Jabatan</TableHead>
-                <TableHead className="min-w-[350px]">Deskripsi</TableHead>
-                <TableHead className="w-[100px]">Status</TableHead>
-                <TableHead className="w-[80px]">Aksi</TableHead>
+                <TableHead className="w-[80px]">ID</TableHead>
+                <TableHead className="w-[120px]">Actual</TableHead>
+                <TableHead className="min-w-[400px]">Subject</TableHead>
+                <TableHead className="w-[120px]">Target</TableHead>
+                <TableHead className="w-[80px]">Action</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -347,17 +378,103 @@ export default function EditableTable() {
                     className="text-center py-8 text-gray-500"
                   >
                     {data.length === 0
-                      ? 'Tidak ada data. Klik tombol "Tambah Data" untuk menambahkan.'
-                      : "Tidak ada data yang sesuai dengan filter."}
+                      ? 'No data. Click "Add New" to create.'
+                      : "No data matches your filter."}
                   </TableCell>
                 </TableRow>
               ) : (
                 filteredData.map((row) => (
-                  <TableRow key={row.id}>
-                    <TableCell>{renderCell(row, "nama")}</TableCell>
-                    <TableCell>{renderCell(row, "jabatan")}</TableCell>
-                    <TableCell>{renderCell(row, "deskripsi")}</TableCell>
-                    <TableCell>{renderCell(row, "status")}</TableCell>
+                  <TableRow key={row.Id}>
+                    <TableCell className="font-medium">{row.Id}</TableCell>
+
+                    <TableCell>
+                      <Select
+                        value={row.Actual || ""}
+                        onValueChange={(value) =>
+                          handleActualChange(row.Id!, value)
+                        }
+                      >
+                        <SelectTrigger className="w-full border-0 shadow-none hover:bg-gray-50">
+                          <SelectValue>
+                            <Badge
+                              variant={
+                                row.Actual === "A"
+                                  ? "default"
+                                  : row.Actual === "B"
+                                  ? "secondary"
+                                  : "outline"
+                              }
+                            >
+                              {row.Actual || "-"}
+                            </Badge>
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="A">A</SelectItem>
+                          <SelectItem value="B">B</SelectItem>
+                          <SelectItem value="C">C</SelectItem>
+                          <SelectItem value="D">D</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </TableCell>
+
+                    <TableCell>
+                      <Popover
+                        open={openSubjectPopover === row.Id}
+                        onOpenChange={(open) => {
+                          setOpenSubjectPopover(open ? row.Id! : null);
+                        }}
+                      >
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            role="combobox"
+                            className="w-full justify-between text-left font-normal px-2 h-auto py-2"
+                          >
+                            <span className="text-sm truncate">
+                              {row.Subject || "Select subject..."}
+                            </span>
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[500px] p-0" align="start">
+                          <Command>
+                            <CommandInput placeholder="Search subject..." />
+                            <CommandList>
+                              <CommandEmpty>No subject found.</CommandEmpty>
+                              <CommandGroup>
+                                {subjectOptions.map((subject) => (
+                                  <CommandItem
+                                    key={subject.Id}
+                                    value={subject.Title}
+                                    onSelect={() => {
+                                      handleSubjectChange(row.Id!, subject.Id!);
+                                    }}
+                                  >
+                                    <Check
+                                      className={cn(
+                                        "mr-2 h-4 w-4",
+                                        row.SubjectId === subject.Id
+                                          ? "opacity-100"
+                                          : "opacity-0"
+                                      )}
+                                    />
+                                    {subject.Title}
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
+                    </TableCell>
+
+                    <TableCell>
+                      <div className="flex items-center justify-center">
+                        <Badge variant="outline">{row.Target || "-"}</Badge>
+                      </div>
+                    </TableCell>
+
                     <TableCell>
                       <Button
                         variant="ghost"
@@ -375,47 +492,35 @@ export default function EditableTable() {
           </Table>
         </div>
 
-        <div className="mt-4 p-4 bg-gray-50 rounded-lg text-xs text-gray-600 space-y-1">
-          <p className="font-semibold">Tips penggunaan Rich Text Editor:</p>
+        <div className="mt-4 p-4 bg-blue-50 rounded-lg text-xs text-gray-600 space-y-1">
+          <p className="font-semibold">How it works:</p>
           <ul className="list-disc list-inside space-y-1 ml-2">
+            <li>Actual: Direct dropdown - choose A, B, C, or D</li>
             <li>
-              <code className="bg-gray-200 px-1 rounded">**teks**</code> untuk{" "}
-              <strong>bold</strong>
+              Subject: Searchable dropdown - click to select or type to filter
             </li>
-            <li>
-              <code className="bg-gray-200 px-1 rounded">*teks*</code> untuk{" "}
-              <em>italic</em>
-            </li>
-            <li>
-              <code className="bg-gray-200 px-1 rounded">• teks</code> untuk
-              bullet points
-            </li>
-            <li>
-              <code className="bg-gray-200 px-1 rounded">[teks](url)</code>{" "}
-              untuk link
-            </li>
+            <li>Target: Auto-filled based on selected Subject (read-only)</li>
+            <li>Changes are local only (not saved to API)</li>
           </ul>
         </div>
       </CardContent>
 
-      {/* Delete Confirmation Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Hapus Data Karyawan?</AlertDialogTitle>
+            <AlertDialogTitle>Delete Record?</AlertDialogTitle>
             <AlertDialogDescription>
-              Apakah Anda yakin ingin menghapus data karyawan{" "}
-              <strong>{employeeToDelete?.nama}</strong>? Tindakan ini tidak
-              dapat dibatalkan.
+              Are you sure you want to delete this record with subject{" "}
+              <strong>{itemToDelete?.Subject}</strong>?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={cancelDelete}>Batal</AlertDialogCancel>
+            <AlertDialogCancel onClick={cancelDelete}>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={confirmDelete}
               className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
             >
-              Ya, Hapus
+              Delete
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

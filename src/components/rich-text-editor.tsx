@@ -4,7 +4,14 @@ import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Bold, Italic, List, Link, Save, X } from "lucide-react";
-import { RichTextEditorProps } from "@/types";
+
+// Define interface di dalam file ini
+interface RichTextEditorProps {
+  value: string;
+  onChange: (value: string) => void;
+  onSave: () => void;
+  onCancel: () => void;
+}
 
 export function RichTextEditor({
   value,
