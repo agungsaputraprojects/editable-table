@@ -1,31 +1,5 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -36,6 +10,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import {
   Command,
   CommandEmpty,
@@ -44,28 +21,44 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
+import { Input } from "@/components/ui/input";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
 import {
-  Plus,
-  Trash2,
-  Search,
-  RefreshCw,
-  AlertCircle,
-  Check,
-  ChevronsUpDown,
-} from "lucide-react";
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import {
   fetchAssessmentSubjects,
   fetchSubjects,
   type AssessmentSubjectRecord,
   type SubjectRecord,
-  type PageInfo,
 } from "@/lib/nocodb-api";
 import { cn } from "@/lib/utils";
+import {
+  AlertCircle,
+  Check,
+  ChevronsUpDown,
+  Plus,
+  RefreshCw,
+  Search,
+  Trash2,
+} from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 interface DisplayData {
   Id?: number;
@@ -82,7 +75,6 @@ export default function EditableTable() {
   const [subjectOptions, setSubjectOptions] = useState<SubjectRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [pageInfo, setPageInfo] = useState<PageInfo | null>(null);
 
   const [openSubjectPopover, setOpenSubjectPopover] = useState<number | null>(
     null
@@ -94,7 +86,6 @@ export default function EditableTable() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<DisplayData | null>(null);
 
-  // Fix: Add proper type annotation
   const renderValue = (value: unknown): string => {
     if (value === null || value === undefined) return "";
     if (typeof value === "string") return value;
@@ -117,7 +108,7 @@ export default function EditableTable() {
     return String(value);
   };
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     setError(null);
 
@@ -161,7 +152,6 @@ export default function EditableTable() {
       );
 
       setData(mappedData);
-      setPageInfo(assessmentResult.pageInfo || null);
     } catch (err) {
       const errorMessage =
         err instanceof Error ? err.message : "Failed to fetch data";
@@ -170,11 +160,11 @@ export default function EditableTable() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [fetchData]);
 
   const filteredData = useMemo(() => {
     return data.filter((row) => {
@@ -299,23 +289,8 @@ export default function EditableTable() {
   return (
     <Card className="w-full">
       <CardHeader>
-        <div className="flex justify-between items-start mb-4">
-          <div>
-            <CardTitle>Assessment Subject Data</CardTitle>
-            <CardDescription>
-              Click on cells to edit. Target auto-fills based on Subject
-              selection.
-            </CardDescription>
-          </div>
+        <div className="flex justify-end items-start mb-4">
           <div className="flex gap-2">
-            <Button
-              onClick={fetchData}
-              variant="outline"
-              className="flex items-center gap-2"
-            >
-              <RefreshCw className="h-4 w-4" />
-              Refresh
-            </Button>
             <Button onClick={addNewRow} className="flex items-center gap-2">
               <Plus className="h-4 w-4" />
               Add New
@@ -354,7 +329,6 @@ export default function EditableTable() {
           <span>
             Showing {filteredData.length} of {data.length} records
           </span>
-          {pageInfo && <span>Total in database: {pageInfo.totalRows}</span>}
         </div>
       </CardHeader>
 
