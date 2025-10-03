@@ -3,9 +3,8 @@
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Bold, Italic, List, Link, Save, X } from "lucide-react";
+import { Bold, Italic, List, Link as LinkIcon, Save, X } from "lucide-react";
 
-// Define interface di dalam file ini
 interface RichTextEditorProps {
   value: string;
   onChange: (value: string) => void;
@@ -50,6 +49,7 @@ export function RichTextEditor({
     const newContent =
       content.substring(0, start) + formattedText + content.substring(end);
     setContent(newContent);
+    onChange(newContent);
   };
 
   const handleSave = () => {
@@ -98,26 +98,29 @@ export function RichTextEditor({
           className="h-8 w-8 p-0"
           title="Link"
         >
-          <Link className="h-4 w-4" />
+          <LinkIcon className="h-4 w-4" />
         </Button>
       </div>
 
       <Textarea
         id="rich-editor"
         value={content}
-        onChange={(e) => setContent(e.target.value)}
+        onChange={(e) => {
+          setContent(e.target.value);
+          onChange(e.target.value);
+        }}
         className="min-h-[120px] resize-none"
-        placeholder="Tulis konten Anda di sini... Gunakan **bold**, *italic*, atau • untuk list"
+        placeholder="Type here... Use **bold**, *italic*, or • for list"
       />
 
       <div className="flex justify-end gap-2">
         <Button type="button" variant="outline" size="sm" onClick={onCancel}>
           <X className="h-4 w-4 mr-1" />
-          Batal
+          Cancel
         </Button>
         <Button type="button" size="sm" onClick={handleSave}>
           <Save className="h-4 w-4 mr-1" />
-          Simpan
+          Save
         </Button>
       </div>
     </div>
