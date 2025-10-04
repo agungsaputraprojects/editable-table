@@ -2,7 +2,20 @@
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import { Input } from "@/components/ui/input";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
@@ -16,14 +29,35 @@ import {
   TableCell,
   TableHead,
   TableHeader,
-  TableRow as UITableRow,
+  TableRow,
 } from "@/components/ui/table";
 import { useAssessmentSubjects } from "@/hooks/useAssessmentSubjects";
-import { AlertCircle, Plus, RefreshCw, Search } from "lucide-react";
+import { cn } from "@/lib/utils";
+import type {
+  DisplayData,
+  FulfilmentStatusType,
+  StatusFilter,
+} from "@/types/nocodb";
+import {
+  ColumnDef,
+  ColumnResizeMode,
+  flexRender,
+  getCoreRowModel,
+  useReactTable,
+} from "@tanstack/react-table";
+import {
+  AlertCircle,
+  Check,
+  ChevronDown,
+  ChevronUp,
+  Plus,
+  RefreshCw,
+  Search,
+  Trash2,
+} from "lucide-react";
 import { useMemo, useState } from "react";
-import type { DisplayData, StatusFilter } from "@/types/nocodb";
 import { DeleteDialog } from "./DeleteDialog";
-import { TableRow } from "./TableRow";
+import { EditableCell } from "./EditableCell";
 
 export default function EditableTable() {
   const {
@@ -54,6 +88,281 @@ export default function EditableTable() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<DisplayData | null>(null);
 
+  // Define columns with TanStack Table
+  const columns = useMemo<ColumnDef<DisplayData>[]>(
+    () => [
+      {
+        accessorKey: "Id",
+        header: "ID",
+        size: 80,
+        minSize: 50,
+        maxSize: 150,
+        cell: (info) => (
+          <div className="font-medium">{info.getValue() as number}</div>
+        ),
+      },
+      {
+        accessorKey: "Subject",
+        header: "Subject",
+        size: 300,
+        minSize: 150,
+        maxSize: 600,
+        cell: (info) => {
+          const row = info.row.original;
+          const isOpen = openSubjectPopover === row.Id;
+
+          return (
+            <Popover
+              open={isOpen}
+              onOpenChange={(open) =>
+                setOpenSubjectPopover(open ? row.Id! : null)
+              }
+            >
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  className="w-full justify-between text-left font-normal px-3 h-10"
+                >
+                  <span className="text-sm truncate block max-w-[240px]">
+                    {row.Subject || "Select subject..."}
+                  </span>
+                  {isOpen ? (
+                    <ChevronUp className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  ) : (
+                    <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[500px] p-0" align="start">
+                <Command>
+                  <CommandInput placeholder="Search subject..." />
+                  <CommandList>
+                    <CommandEmpty>No subject found.</CommandEmpty>
+                    <CommandGroup>
+                      {subjectOptions.map((subject) => (
+                        <CommandItem
+                          key={subject.Id}
+                          value={subject.Title}
+                          onSelect={() => {
+                            updateSubject(row.Id!, subject.Id!);
+                            setOpenSubjectPopover(null);
+                          }}
+                        >
+                          <Check
+                            className={cn(
+                              "mr-2 h-4 w-4",
+                              row.SubjectId === subject.Id
+                                ? "opacity-100"
+                                : "opacity-0"
+                            )}
+                          />
+                          {subject.Title}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+          );
+        },
+      },
+      {
+        accessorKey: "Target",
+        header: "Target",
+        size: 300,
+        minSize: 150,
+        maxSize: 600,
+        cell: (info) => {
+          const row = info.row.original;
+          return (
+            <EditableCell
+              value={row.Target || ""}
+              onSave={(newValue) => updateTarget(row.Id!, newValue)}
+              placeholder="Click to edit target..."
+            />
+          );
+        },
+      },
+      {
+        accessorKey: "Actual",
+        header: "Actual",
+        size: 200,
+        minSize: 100,
+        maxSize: 400,
+        cell: (info) => {
+          const row = info.row.original;
+          return (
+            <EditableCell
+              value={row.Actual || ""}
+              onSave={(newValue) => updateActual(row.Id!, newValue)}
+              placeholder="Click to edit actual..."
+            />
+          );
+        },
+      },
+      {
+        accessorKey: "FulfilmentStatus",
+        header: "Fulfilment Status",
+        size: 180,
+        minSize: 120,
+        maxSize: 300,
+        cell: (info) => {
+          const row = info.row.original;
+          const getStatusColor = (status: FulfilmentStatusType) => {
+            if (status === "Fully Met")
+              return "text-green-600 border-green-600";
+            if (status === "Partially Met")
+              return "text-yellow-600 border-yellow-600";
+            if (status === "Not Met") return "text-red-600 border-red-600";
+            return "";
+          };
+
+          return (
+            <Select
+              value={row.FulfilmentStatus || ""}
+              onValueChange={(value) =>
+                updateFulfilmentStatus(row.Id!, value as FulfilmentStatusType)
+              }
+            >
+              <SelectTrigger
+                className={cn(
+                  "w-full",
+                  row.FulfilmentStatus && getStatusColor(row.FulfilmentStatus)
+                )}
+              >
+                <SelectValue placeholder="Select status...">
+                  {row.FulfilmentStatus ? (
+                    <span className="text-sm font-semibold">
+                      {row.FulfilmentStatus}
+                    </span>
+                  ) : (
+                    <span className="text-gray-400">Select status...</span>
+                  )}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Fully Met">
+                  <span className="text-green-600 font-semibold">
+                    Fully Met
+                  </span>
+                </SelectItem>
+                <SelectItem value="Partially Met">
+                  <span className="text-yellow-600 font-semibold">
+                    Partially Met
+                  </span>
+                </SelectItem>
+                <SelectItem value="Not Met">
+                  <span className="text-red-600 font-semibold">Not Met</span>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          );
+        },
+      },
+      {
+        accessorKey: "Assessment",
+        header: "Assessment",
+        size: 250,
+        minSize: 150,
+        maxSize: 400,
+        cell: (info) => {
+          const row = info.row.original;
+          const isOpen = openAssessmentPopover === row.Id;
+
+          return (
+            <Popover
+              open={isOpen}
+              onOpenChange={(open) =>
+                setOpenAssessmentPopover(open ? row.Id! : null)
+              }
+            >
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  className="w-full justify-between text-left font-normal px-3 h-10"
+                >
+                  <span className="text-sm truncate block max-w-[180px]">
+                    {row.Assessment || "Select assessment..."}
+                  </span>
+                  {isOpen ? (
+                    <ChevronUp className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  ) : (
+                    <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[400px] p-0" align="start">
+                <Command>
+                  <CommandInput placeholder="Search assessment..." />
+                  <CommandList>
+                    <CommandEmpty>No assessment found.</CommandEmpty>
+                    <CommandGroup>
+                      {assessmentOptions.map((assessment) => (
+                        <CommandItem
+                          key={assessment.Id}
+                          value={assessment.Title}
+                          onSelect={() => {
+                            updateAssessment(row.Id!, assessment.Id!);
+                            setOpenAssessmentPopover(null);
+                          }}
+                        >
+                          <Check
+                            className={cn(
+                              "mr-2 h-4 w-4",
+                              row.AssessmentId === assessment.Id
+                                ? "opacity-100"
+                                : "opacity-0"
+                            )}
+                          />
+                          {assessment.Title}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+          );
+        },
+      },
+      {
+        id: "action",
+        header: "Action",
+        size: 80,
+        minSize: 60,
+        maxSize: 120,
+        cell: (info) => {
+          const row = info.row.original;
+          return (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => handleDeleteClick(row)}
+              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          );
+        },
+      },
+    ],
+    [
+      subjectOptions,
+      assessmentOptions,
+      openSubjectPopover,
+      openAssessmentPopover,
+      updateSubject,
+      updateTarget,
+      updateActual,
+      updateFulfilmentStatus,
+      updateAssessment,
+    ]
+  );
+
+  // Filter data
   const filteredData = useMemo(() => {
     return data.filter((row) => {
       const matchesStatus =
@@ -72,6 +381,14 @@ export default function EditableTable() {
     });
   }, [data, searchQuery, statusFilter]);
 
+  // Initialize TanStack Table
+  const table = useReactTable({
+    data: filteredData,
+    columns,
+    getCoreRowModel: getCoreRowModel(),
+    columnResizeMode: "onChange" as ColumnResizeMode,
+  });
+
   const handleDeleteClick = (item: DisplayData) => {
     setItemToDelete(item);
     setDeleteDialogOpen(true);
@@ -88,16 +405,6 @@ export default function EditableTable() {
   const cancelDelete = () => {
     setDeleteDialogOpen(false);
     setItemToDelete(null);
-  };
-
-  const handleSubjectChange = (rowId: number, subjectId: number) => {
-    updateSubject(rowId, subjectId);
-    setOpenSubjectPopover(null);
-  };
-
-  const handleAssessmentChange = (rowId: number, assessmentId: number) => {
-    updateAssessment(rowId, assessmentId);
-    setOpenAssessmentPopover(null);
   };
 
   if (loading) {
@@ -181,48 +488,71 @@ export default function EditableTable() {
 
       <CardContent>
         <div className="rounded-md border overflow-x-auto">
-          <Table>
+          <Table style={{ width: table.getCenterTotalSize() }}>
             <TableHeader>
-              <UITableRow>
-                <TableHead className="w-[80px]">ID</TableHead>
-                <TableHead className="w-[300px]">Subject</TableHead>
-                <TableHead className="w-[300px]">Target</TableHead>
-                <TableHead className="w-[200px]">Actual</TableHead>
-                <TableHead className="w-[180px]">Fulfilment Status</TableHead>
-                <TableHead className="w-[250px]">Assessment</TableHead>
-                <TableHead className="w-[80px]">Action</TableHead>
-              </UITableRow>
+              {table.getHeaderGroups().map((headerGroup) => (
+                <TableRow key={headerGroup.id}>
+                  {headerGroup.headers.map((header) => (
+                    <TableHead
+                      key={header.id}
+                      className="relative"
+                      style={{
+                        width: header.getSize(),
+                      }}
+                    >
+                      {header.isPlaceholder
+                        ? null
+                        : flexRender(
+                            header.column.columnDef.header,
+                            header.getContext()
+                          )}
+
+                      {/* Resize Handle */}
+                      <div
+                        onMouseDown={header.getResizeHandler()}
+                        onTouchStart={header.getResizeHandler()}
+                        className={cn(
+                          "absolute right-0 top-0 h-full w-1 cursor-col-resize select-none touch-none",
+                          "hover:bg-blue-500 active:bg-blue-600",
+                          header.column.getIsResizing() && "bg-blue-600"
+                        )}
+                      >
+                        <div className="absolute inset-y-0 -left-1 -right-1" />
+                      </div>
+                    </TableHead>
+                  ))}
+                </TableRow>
+              ))}
             </TableHeader>
             <TableBody>
-              {filteredData.length === 0 ? (
-                <UITableRow>
+              {table.getRowModel().rows.length === 0 ? (
+                <TableRow>
                   <TableCell
-                    colSpan={7}
+                    colSpan={columns.length}
                     className="text-center py-8 text-gray-500"
                   >
                     {data.length === 0
                       ? 'No data. Click "Add New" to create.'
                       : "No data matches your filter."}
                   </TableCell>
-                </UITableRow>
+                </TableRow>
               ) : (
-                filteredData.map((row) => (
-                  <TableRow
-                    key={row.Id}
-                    row={row}
-                    subjectOptions={subjectOptions}
-                    assessmentOptions={assessmentOptions}
-                    openSubjectPopover={openSubjectPopover}
-                    openAssessmentPopover={openAssessmentPopover}
-                    onOpenSubjectPopover={setOpenSubjectPopover}
-                    onOpenAssessmentPopover={setOpenAssessmentPopover}
-                    onActualChange={updateActual}
-                    onTargetChange={updateTarget}
-                    onFulfilmentStatusChange={updateFulfilmentStatus}
-                    onAssessmentChange={handleAssessmentChange}
-                    onSubjectChange={handleSubjectChange}
-                    onDelete={handleDeleteClick}
-                  />
+                table.getRowModel().rows.map((row) => (
+                  <TableRow key={row.id}>
+                    {row.getVisibleCells().map((cell) => (
+                      <TableCell
+                        key={cell.id}
+                        style={{
+                          width: cell.column.getSize(),
+                        }}
+                      >
+                        {flexRender(
+                          cell.column.columnDef.cell,
+                          cell.getContext()
+                        )}
+                      </TableCell>
+                    ))}
+                  </TableRow>
                 ))
               )}
             </TableBody>
