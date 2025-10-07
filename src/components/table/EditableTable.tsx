@@ -63,7 +63,6 @@ export default function EditableTable() {
   const {
     data,
     subjectOptions,
-    assessmentOptions,
     loading,
     error,
     actualValues,
@@ -73,22 +72,17 @@ export default function EditableTable() {
     updateActual,
     updateTarget,
     updateFulfilmentStatus,
-    updateAssessment,
     updateSubject,
   } = useAssessmentSubjects();
 
   const [openSubjectPopover, setOpenSubjectPopover] = useState<number | null>(
     null
   );
-  const [openAssessmentPopover, setOpenAssessmentPopover] = useState<
-    number | null
-  >(null);
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("All");
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<DisplayData | null>(null);
 
-  // Define columns with TanStack Table
   const columns = useMemo<ColumnDef<DisplayData>[]>(
     () => [
       {
@@ -204,7 +198,7 @@ export default function EditableTable() {
       },
       {
         accessorKey: "FulfilmentStatus",
-        header: "Fulfilment Status",
+        header: "Status",
         size: 180,
         minSize: 120,
         maxSize: 300,
@@ -262,69 +256,61 @@ export default function EditableTable() {
         },
       },
       {
-        accessorKey: "Assessment",
-        header: "Assessment",
-        size: 250,
-        minSize: 150,
-        maxSize: 400,
+        accessorKey: "Fulfilment",
+        header: "Fulfilment",
+        size: 180,
+        minSize: 120,
+        maxSize: 300,
         cell: (info) => {
           const row = info.row.original;
-          const isOpen = openAssessmentPopover === row.Id;
+          const getStatusColor = (status: FulfilmentStatusType) => {
+            if (status === "Fully Met")
+              return "text-green-600 border-green-600";
+            if (status === "Partially Met")
+              return "text-yellow-600 border-yellow-600";
+            if (status === "Not Met") return "text-red-600 border-red-600";
+            return "";
+          };
 
           return (
-            <Popover
-              open={isOpen}
-              onOpenChange={(open) =>
-                setOpenAssessmentPopover(open ? row.Id! : null)
+            <Select
+              value={row.FulfilmentStatus || ""}
+              onValueChange={(value) =>
+                updateFulfilmentStatus(row.Id!, value as FulfilmentStatusType)
               }
             >
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  role="combobox"
-                  className="w-full justify-between text-left font-normal px-3 h-10"
-                >
-                  <span className="text-sm truncate block max-w-[180px]">
-                    {row.Assessment || "Select assessment..."}
-                  </span>
-                  {isOpen ? (
-                    <ChevronUp className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+              <SelectTrigger
+                className={cn(
+                  "w-full",
+                  row.FulfilmentStatus && getStatusColor(row.FulfilmentStatus)
+                )}
+              >
+                <SelectValue placeholder="Select status...">
+                  {row.FulfilmentStatus ? (
+                    <span className="text-sm font-semibold">
+                      {row.FulfilmentStatus}
+                    </span>
                   ) : (
-                    <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    <span className="text-gray-400">Select status...</span>
                   )}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-[400px] p-0" align="start">
-                <Command>
-                  <CommandInput placeholder="Search assessment..." />
-                  <CommandList>
-                    <CommandEmpty>No assessment found.</CommandEmpty>
-                    <CommandGroup>
-                      {assessmentOptions.map((assessment) => (
-                        <CommandItem
-                          key={assessment.Id}
-                          value={assessment.Title}
-                          onSelect={() => {
-                            updateAssessment(row.Id!, assessment.Id!);
-                            setOpenAssessmentPopover(null);
-                          }}
-                        >
-                          <Check
-                            className={cn(
-                              "mr-2 h-4 w-4",
-                              row.AssessmentId === assessment.Id
-                                ? "opacity-100"
-                                : "opacity-0"
-                            )}
-                          />
-                          {assessment.Title}
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  </CommandList>
-                </Command>
-              </PopoverContent>
-            </Popover>
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Fully Met">
+                  <span className="text-green-600 font-semibold">
+                    Fully Met
+                  </span>
+                </SelectItem>
+                <SelectItem value="Partially Met">
+                  <span className="text-yellow-600 font-semibold">
+                    Partially Met
+                  </span>
+                </SelectItem>
+                <SelectItem value="Not Met">
+                  <span className="text-red-600 font-semibold">Not Met</span>
+                </SelectItem>
+              </SelectContent>
+            </Select>
           );
         },
       },
@@ -351,18 +337,14 @@ export default function EditableTable() {
     ],
     [
       subjectOptions,
-      assessmentOptions,
       openSubjectPopover,
-      openAssessmentPopover,
       updateSubject,
       updateTarget,
       updateActual,
       updateFulfilmentStatus,
-      updateAssessment,
     ]
   );
 
-  // Filter data
   const filteredData = useMemo(() => {
     return data.filter((row) => {
       const matchesStatus =
@@ -374,14 +356,12 @@ export default function EditableTable() {
         (row.Actual && row.Actual.toLowerCase().includes(searchLower)) ||
         (row.Target && row.Target.toLowerCase().includes(searchLower)) ||
         (row.FulfilmentStatus &&
-          row.FulfilmentStatus.toLowerCase().includes(searchLower)) ||
-        (row.Assessment && row.Assessment.toLowerCase().includes(searchLower));
+          row.FulfilmentStatus.toLowerCase().includes(searchLower));
 
       return matchesStatus && matchesSearch;
     });
   }, [data, searchQuery, statusFilter]);
 
-  // Initialize TanStack Table
   const table = useReactTable({
     data: filteredData,
     columns,
@@ -457,7 +437,7 @@ export default function EditableTable() {
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
             <Input
               type="text"
-              placeholder="Search Subject, Actual, Target, Fulfilment Status, or Assessment..."
+              placeholder="Search Subject, Actual, Target, or Fulfilment Status..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-10"
@@ -507,7 +487,6 @@ export default function EditableTable() {
                             header.getContext()
                           )}
 
-                      {/* Resize Handle */}
                       <div
                         onMouseDown={header.getResizeHandler()}
                         onTouchStart={header.getResizeHandler()}
