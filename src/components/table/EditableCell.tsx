@@ -2,9 +2,9 @@
 
 import { useState, useEffect } from "react";
 import {
-  RichTextEditor,
-  RichTextDisplay,
-} from "@/components/rich-text/RichTextEditor";
+  TipTapEditor,
+  TipTapDisplay,
+} from "@/components/rich-text/TipTapEditor";
 
 interface EditableCellProps {
   value: string;
@@ -36,11 +36,12 @@ export function EditableCell({
 
   if (isEditing) {
     return (
-      <RichTextEditor
+      <TipTapEditor
         value={editValue}
         onChange={setEditValue}
         onSave={handleSave}
         onCancel={handleCancel}
+        placeholder={placeholder}
       />
     );
   }
@@ -51,7 +52,7 @@ export function EditableCell({
       className="cursor-pointer hover:bg-gray-50 p-2 rounded min-h-[40px] border border-transparent hover:border-gray-200"
     >
       {value ? (
-        <RichTextDisplay content={value} />
+        <TipTapDisplay content={value} />
       ) : (
         <span className="text-gray-400 text-sm">
           {placeholder || "Click to edit..."}

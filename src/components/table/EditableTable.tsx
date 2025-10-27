@@ -54,6 +54,8 @@ import {
   RefreshCw,
   Search,
   Trash2,
+  Eye,
+  Pencil,
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { DeleteDialog } from "./DeleteDialog";
@@ -86,25 +88,43 @@ export default function EditableTable() {
   const columns = useMemo<ColumnDef<DisplayData>[]>(
     () => [
       {
-        accessorKey: "Id",
-        header: "ID",
-        size: 80,
-        minSize: 50,
-        maxSize: 150,
-        cell: (info) => (
-          <div className="font-medium">{info.getValue() as number}</div>
-        ),
-      },
-      {
         accessorKey: "Subject",
         header: "Subject",
-        size: 300,
-        minSize: 150,
+        size: 350,
+        minSize: 200,
         maxSize: 600,
         cell: (info) => {
           const row = info.row.original;
           const isOpen = openSubjectPopover === row.Id;
+          const hasSubject = Boolean(row.Subject);
 
+          // Jika sudah ada subject, tampilkan sebagai text yang bisa diklik dengan 2 field tambahan
+          if (hasSubject && !isOpen) {
+            return (
+              <div
+                onClick={() => setOpenSubjectPopover(row.Id!)}
+                className="px-3 py-2 text-sm cursor-pointer hover:bg-gray-50 rounded transition-colors"
+              >
+                <div className="space-y-1">
+                  <span className="block max-w-[280px] font-medium">
+                    {row.Subject}
+                  </span>
+                  {row.StandardName && (
+                    <div className="text-xs text-gray-600">
+                      {row.StandardName}
+                    </div>
+                  )}
+                  {row.StandardCode && (
+                    <div className="text-xs text-gray-600">
+                      {row.StandardCode}
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          }
+
+          // Tampilkan sebagai dropdown (baik untuk yang belum ada subject atau sedang dibuka)
           return (
             <Popover
               open={isOpen}
@@ -118,7 +138,7 @@ export default function EditableTable() {
                   role="combobox"
                   className="w-full justify-between text-left font-normal px-3 h-10"
                 >
-                  <span className="text-sm truncate block max-w-[240px]">
+                  <span className="text-sm truncate block max-w-[280px]">
                     {row.Subject || "Select subject..."}
                   </span>
                   {isOpen ? (
@@ -134,26 +154,37 @@ export default function EditableTable() {
                   <CommandList>
                     <CommandEmpty>No subject found.</CommandEmpty>
                     <CommandGroup>
-                      {subjectOptions.map((subject) => (
-                        <CommandItem
-                          key={subject.Id}
-                          value={subject.Title}
-                          onSelect={() => {
-                            updateSubject(row.Id!, subject.Id!);
-                            setOpenSubjectPopover(null);
-                          }}
-                        >
-                          <Check
-                            className={cn(
-                              "mr-2 h-4 w-4",
-                              row.SubjectId === subject.Id
-                                ? "opacity-100"
-                                : "opacity-0"
-                            )}
-                          />
-                          {subject.Title}
-                        </CommandItem>
-                      ))}
+                      {subjectOptions
+                        .filter(
+                          (subject) =>
+                            subject.Id && (subject.Title || subject.Validate)
+                        )
+                        .map((subject) => (
+                          <CommandItem
+                            key={subject.Id}
+                            value={
+                              subject.Title ||
+                              subject.Validate ||
+                              `subject-${subject.Id}`
+                            }
+                            onSelect={() => {
+                              updateSubject(row.Id!, subject.Id!);
+                              setOpenSubjectPopover(null);
+                            }}
+                          >
+                            <Check
+                              className={cn(
+                                "mr-2 h-4 w-4",
+                                row.SubjectId === subject.Id
+                                  ? "opacity-100"
+                                  : "opacity-0"
+                              )}
+                            />
+                            {subject.Title ||
+                              subject.Validate ||
+                              `Subject ${subject.Id}`}
+                          </CommandItem>
+                        ))}
                     </CommandGroup>
                   </CommandList>
                 </Command>
@@ -165,8 +196,8 @@ export default function EditableTable() {
       {
         accessorKey: "Target",
         header: "Target",
-        size: 300,
-        minSize: 150,
+        size: 350,
+        minSize: 200,
         maxSize: 600,
         cell: (info) => {
           const row = info.row.original;
@@ -182,9 +213,9 @@ export default function EditableTable() {
       {
         accessorKey: "Actual",
         header: "Actual",
-        size: 200,
-        minSize: 100,
-        maxSize: 400,
+        size: 350,
+        minSize: 200,
+        maxSize: 600,
         cell: (info) => {
           const row = info.row.original;
           return (
@@ -256,81 +287,50 @@ export default function EditableTable() {
         },
       },
       {
-        accessorKey: "Fulfilment",
-        header: "Fulfilment",
-        size: 180,
+        accessorKey: "actions",
+        header: "Actions",
+        size: 150,
         minSize: 120,
-        maxSize: 300,
+        maxSize: 200,
         cell: (info) => {
           const row = info.row.original;
-          const getStatusColor = (status: FulfilmentStatusType) => {
-            if (status === "Fully Met")
-              return "text-green-600 border-green-600";
-            if (status === "Partially Met")
-              return "text-yellow-600 border-yellow-600";
-            if (status === "Not Met") return "text-red-600 border-red-600";
-            return "";
+
+          const handleDeleteClick = (item: DisplayData) => {
+            setItemToDelete(item);
+            setDeleteDialogOpen(true);
           };
 
           return (
-            <Select
-              value={row.FulfilmentStatus || ""}
-              onValueChange={(value) =>
-                updateFulfilmentStatus(row.Id!, value as FulfilmentStatusType)
-              }
-            >
-              <SelectTrigger
-                className={cn(
-                  "w-full",
-                  row.FulfilmentStatus && getStatusColor(row.FulfilmentStatus)
-                )}
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                onClick={() => {
+                  console.log("View detail:", row.Id);
+                }}
               >
-                <SelectValue placeholder="Select status...">
-                  {row.FulfilmentStatus ? (
-                    <span className="text-sm font-semibold">
-                      {row.FulfilmentStatus}
-                    </span>
-                  ) : (
-                    <span className="text-gray-400">Select status...</span>
-                  )}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Fully Met">
-                  <span className="text-green-600 font-semibold">
-                    Fully Met
-                  </span>
-                </SelectItem>
-                <SelectItem value="Partially Met">
-                  <span className="text-yellow-600 font-semibold">
-                    Partially Met
-                  </span>
-                </SelectItem>
-                <SelectItem value="Not Met">
-                  <span className="text-red-600 font-semibold">Not Met</span>
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          );
-        },
-      },
-      {
-        id: "action",
-        header: "Action",
-        size: 80,
-        minSize: 60,
-        maxSize: 120,
-        cell: (info) => {
-          const row = info.row.original;
-          return (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => handleDeleteClick(row)}
-              className="text-red-600 hover:text-red-700 hover:bg-red-50"
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
+                <Eye className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-gray-600 hover:text-gray-700 hover:bg-gray-50"
+                onClick={() => {
+                  console.log("Edit:", row.Id);
+                }}
+              >
+                <Pencil className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
+                onClick={() => handleDeleteClick(row)}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
           );
         },
       },
@@ -368,11 +368,6 @@ export default function EditableTable() {
     getCoreRowModel: getCoreRowModel(),
     columnResizeMode: "onChange" as ColumnResizeMode,
   });
-
-  const handleDeleteClick = (item: DisplayData) => {
-    setItemToDelete(item);
-    setDeleteDialogOpen(true);
-  };
 
   const confirmDelete = () => {
     if (itemToDelete) {
@@ -437,7 +432,7 @@ export default function EditableTable() {
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
             <Input
               type="text"
-              placeholder="Search Subject, Actual, Target, or Fulfilment Status..."
+              placeholder="Search Subject, Actual, Target, or Status..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-10"
@@ -475,7 +470,7 @@ export default function EditableTable() {
                   {headerGroup.headers.map((header) => (
                     <TableHead
                       key={header.id}
-                      className="relative"
+                      className="relative bg-cyan-400 text-white font-semibold"
                       style={{
                         width: header.getSize(),
                       }}
@@ -492,8 +487,8 @@ export default function EditableTable() {
                         onTouchStart={header.getResizeHandler()}
                         className={cn(
                           "absolute right-0 top-0 h-full w-1 cursor-col-resize select-none touch-none",
-                          "hover:bg-blue-500 active:bg-blue-600",
-                          header.column.getIsResizing() && "bg-blue-600"
+                          "hover:bg-cyan-600 active:bg-cyan-700",
+                          header.column.getIsResizing() && "bg-cyan-600"
                         )}
                       >
                         <div className="absolute inset-y-0 -left-1 -right-1" />

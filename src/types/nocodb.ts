@@ -6,10 +6,41 @@ export interface AssessmentSubjectRecord {
   [key: string]: unknown;
 }
 
+export interface ParameterRecord {
+  Id?: number;
+  standard_id?: number | StandardRecord | StandardRecord[];
+  Validate?: string;
+  Title?: string;
+  Standard?: string | StandardRecord | StandardRecord[];
+  [key: string]: unknown;
+}
+
+export interface StandardRecord {
+  Id?: number;
+  Validate?: string;
+  Standard?: string;
+  [key: string]: unknown;
+}
+
+export interface DomainRecord {
+  Id?: number;
+  Salary?: string;
+  [key: string]: unknown;
+}
+
+export interface IndustryRecord {
+  Id?: number;
+  Title?: string;
+  [key: string]: unknown;
+}
+
 export interface SubjectRecord {
   Id?: number;
   Title?: string;
+  Validate?: string;
   Target?: string;
+  standard_id?: number | StandardRecord | StandardRecord[];
+  Standard?: string | StandardRecord | StandardRecord[];
   [key: string]: unknown;
 }
 
@@ -28,6 +59,8 @@ export interface DisplayData {
   FulfilmentStatus?: "Fully Met" | "Partially Met" | "Not Met" | "";
   Assessment?: string;
   AssessmentId?: number;
+  StandardName?: string;
+  StandardCode?: string;
 }
 
 export interface PageInfo {
@@ -45,12 +78,20 @@ export interface NocoDBResponse<T> {
 
 export interface APIConfig {
   baseUrl: string;
-  assessmentSubjectTableId: string;
-  assessmentSubjectViewId: string;
-  subjectTableId: string;
-  subjectViewId: string;
+  assessmentParameterTableId: string;
+  assessmentParameterViewId: string;
+  parameterTableId: string;
+  parameterViewId: string;
+  standardTableId: string;
+  standardViewId: string;
+  domainTableId: string;
+  domainViewId: string;
+  industryTableId: string;
+  industryViewId: string;
   assessmentTableId: string;
   assessmentViewId: string;
+  userTableId: string;
+  userViewId: string;
   token: string;
 }
 

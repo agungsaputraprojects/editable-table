@@ -1,13 +1,13 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
+import { AppShell } from "@/components/layout/AppShell";
 
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Edit Data Karyawan - Next.js + TypeScript + shadcn/ui",
-  description:
-    "Editable table dengan rich text editor dan filter menggunakan Next.js 14, TypeScript, dan shadcn/ui",
+  title: "Infosec",
+  description: "Assessment management system",
 };
 
 export default function RootLayout({
@@ -17,7 +17,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="id">
-      <body className={inter.className}>{children}</body>
+      <body className={inter.className}>
+        <AppShell>{children}</AppShell>
+      </body>
     </html>
   );
 }
