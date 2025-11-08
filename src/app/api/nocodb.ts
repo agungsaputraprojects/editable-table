@@ -153,6 +153,48 @@ export class NocoDBAPI {
       limit
     );
   }
+
+  async createAssessmentParameter(data: {
+    SubjectId?: number;
+    Actual?: string;
+    Target?: string;
+    FulfilmentStatus?: string;
+    AssessmentId?: number;
+  }): Promise<any> {
+    const url = `${this.config.baseUrl}/${this.config.assessmentParameterTableId}/records`;
+
+    console.log(`Creating record at: ${url}`);
+    console.log("Request body:", data);
+
+    // Map frontend field names to NocoDB field names
+    const requestBody = {
+      Subject: data.SubjectId ? [data.SubjectId] : undefined,
+      Actual: data.Actual || "",
+      Target: data.Target || "",
+      Fulfilment: data.FulfilmentStatus || "",
+      Assessment: data.AssessmentId ? [data.AssessmentId] : undefined,
+    };
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "xc-token": this.config.token,
+      },
+      body: JSON.stringify(requestBody),
+    });
+
+    if (!response.ok) {
+      console.error(`HTTP error! status: ${response.status}`);
+      const errorText = await response.text();
+      console.error(`Error response: ${errorText}`);
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const result = await response.json();
+    console.log(`Create response:`, result);
+    return result;
+  }
 }
 
 export const nocoDBAPI = new NocoDBAPI();
