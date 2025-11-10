@@ -160,13 +160,12 @@ export class NocoDBAPI {
     Target?: string;
     FulfilmentStatus?: string;
     AssessmentId?: number;
-  }): Promise<any> {
+  }): Promise<{ Id: number; [key: string]: unknown }> {
     const url = `${this.config.baseUrl}/${this.config.assessmentParameterTableId}/records`;
 
     console.log(`Creating record at: ${url}`);
     console.log("Request body:", data);
 
-    // Map frontend field names to NocoDB field names
     const requestBody = {
       Subject: data.SubjectId ? [data.SubjectId] : undefined,
       Actual: data.Actual || "",
@@ -193,6 +192,86 @@ export class NocoDBAPI {
 
     const result = await response.json();
     console.log(`Create response:`, result);
+    return result;
+  }
+
+  async updateAssessmentParameter(
+    id: number,
+    data: {
+      SubjectId?: number;
+      Actual?: string;
+      Target?: string;
+      FulfilmentStatus?: string;
+      AssessmentId?: number;
+    }
+  ): Promise<{ Id: number; [key: string]: unknown }> {
+    const url = `${this.config.baseUrl}/${this.config.assessmentParameterTableId}/records`;
+
+    console.log(`Updating record at: ${url}`);
+    console.log("Record ID:", id);
+    console.log("Update data:", data);
+
+    const requestBody = {
+      Id: id,
+      Subject: data.SubjectId ? [data.SubjectId] : undefined,
+      Actual: data.Actual,
+      Target: data.Target,
+      Fulfilment: data.FulfilmentStatus,
+      Assessment: data.AssessmentId ? [data.AssessmentId] : undefined,
+    };
+
+    // Remove undefined values
+    Object.keys(requestBody).forEach((key) => {
+      if (requestBody[key as keyof typeof requestBody] === undefined) {
+        delete requestBody[key as keyof typeof requestBody];
+      }
+    });
+
+    const response = await fetch(url, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        "xc-token": this.config.token,
+      },
+      body: JSON.stringify(requestBody),
+    });
+
+    if (!response.ok) {
+      console.error(`HTTP error! status: ${response.status}`);
+      const errorText = await response.text();
+      console.error(`Error response: ${errorText}`);
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const result = await response.json();
+    console.log(`Update response:`, result);
+    return result;
+  }
+
+  async deleteAssessmentParameter(id: number): Promise<{ Id: number }> {
+    const url = `${this.config.baseUrl}/${this.config.assessmentParameterTableId}/records`;
+
+    console.log(`Deleting record at: ${url}`);
+    console.log("Record ID:", id);
+
+    const response = await fetch(url, {
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+        "xc-token": this.config.token,
+      },
+      body: JSON.stringify({ Id: id }),
+    });
+
+    if (!response.ok) {
+      console.error(`HTTP error! status: ${response.status}`);
+      const errorText = await response.text();
+      console.error(`Error response: ${errorText}`);
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const result = await response.json();
+    console.log(`Delete response:`, result);
     return result;
   }
 }

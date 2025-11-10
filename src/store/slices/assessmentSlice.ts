@@ -4,9 +4,15 @@ import type {
   SubjectRecord,
   StandardRecord,
   AssessmentRecord,
+  AssessmentSubjectRecord,
   FulfilmentStatusType,
 } from "@/types/nocodb";
 import { nocoDBAPI } from "@/app/api/nocodb";
+
+interface ExtendedAssessmentSubjectRecord extends AssessmentSubjectRecord {
+  Parameter?: unknown;
+  Fulfilment?: string;
+}
 
 interface AssessmentState {
   data: DisplayData[];
@@ -16,6 +22,9 @@ interface AssessmentState {
   loading: boolean;
   error: string | null;
   isAddDialogOpen: boolean;
+  isEditDialogOpen: boolean;
+  isDeleteDialogOpen: boolean;
+  selectedItem: DisplayData | null;
 }
 
 const initialState: AssessmentState = {
@@ -26,9 +35,11 @@ const initialState: AssessmentState = {
   loading: false,
   error: null,
   isAddDialogOpen: false,
+  isEditDialogOpen: false,
+  isDeleteDialogOpen: false,
+  selectedItem: null,
 };
 
-// Helper function to render values
 const renderValue = (value: unknown): string => {
   if (value === null || value === undefined) return "";
   if (typeof value === "string") return value;
@@ -53,13 +64,11 @@ const renderValue = (value: unknown): string => {
   return String(value);
 };
 
-// Async Thunks
 export const fetchAllData = createAsyncThunk(
   "assessment/fetchAllData",
   async () => {
     console.log("=== Starting Data Fetch ===");
 
-    // Fetch all data in parallel
     const [
       parametersResult,
       standardsResult,
@@ -77,9 +86,8 @@ export const fetchAllData = createAsyncThunk(
     console.log("Assessments:", assessmentsResult);
     console.log("Assessment Parameters:", assessmentResult);
 
-    // Map assessment data
     const mappedData: DisplayData[] = (assessmentResult.list || []).map(
-      (item: any) => {
+      (item: ExtendedAssessmentSubjectRecord) => {
         const parameterValue = item.Parameter || item.Subject;
         let subjectTitle = "";
         let subjectId: number | undefined;
@@ -142,11 +150,37 @@ export const createAssessmentParameter = createAsyncThunk(
     AssessmentId?: number;
   }) => {
     console.log("Creating new assessment parameter:", newData);
-
     const response = await nocoDBAPI.createAssessmentParameter(newData);
     console.log("Create response:", response);
-
     return response;
+  }
+);
+
+export const updateAssessmentParameter = createAsyncThunk(
+  "assessment/update",
+  async (updateData: {
+    id: number;
+    SubjectId?: number;
+    Actual?: string;
+    Target?: string;
+    FulfilmentStatus?: string;
+    AssessmentId?: number;
+  }) => {
+    console.log("Updating assessment parameter:", updateData);
+    const { id, ...data } = updateData;
+    const response = await nocoDBAPI.updateAssessmentParameter(id, data);
+    console.log("Update response:", response);
+    return response;
+  }
+);
+
+export const deleteAssessmentParameter = createAsyncThunk(
+  "assessment/delete",
+  async (id: number) => {
+    console.log("Deleting assessment parameter:", id);
+    const response = await nocoDBAPI.deleteAssessmentParameter(id);
+    console.log("Delete response:", response);
+    return { id };
   }
 );
 
@@ -156,6 +190,15 @@ const assessmentSlice = createSlice({
   reducers: {
     setAddDialogOpen: (state, action: PayloadAction<boolean>) => {
       state.isAddDialogOpen = action.payload;
+    },
+    setEditDialogOpen: (state, action: PayloadAction<boolean>) => {
+      state.isEditDialogOpen = action.payload;
+    },
+    setDeleteDialogOpen: (state, action: PayloadAction<boolean>) => {
+      state.isDeleteDialogOpen = action.payload;
+    },
+    setSelectedItem: (state, action: PayloadAction<DisplayData | null>) => {
+      state.selectedItem = action.payload;
     },
     clearError: (state) => {
       state.error = null;
@@ -179,7 +222,7 @@ const assessmentSlice = createSlice({
         state.loading = false;
         state.error = action.error.message || "Failed to fetch data";
       })
-      // Create Assessment Parameter
+      // Create
       .addCase(createAssessmentParameter.pending, (state) => {
         state.loading = true;
         state.error = null;
@@ -191,9 +234,44 @@ const assessmentSlice = createSlice({
       .addCase(createAssessmentParameter.rejected, (state, action) => {
         state.loading = false;
         state.error = action.error.message || "Failed to create record";
+      })
+      // Update
+      .addCase(updateAssessmentParameter.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(updateAssessmentParameter.fulfilled, (state) => {
+        state.loading = false;
+        state.isEditDialogOpen = false;
+        state.selectedItem = null;
+      })
+      .addCase(updateAssessmentParameter.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.error.message || "Failed to update record";
+      })
+      // Delete
+      .addCase(deleteAssessmentParameter.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(deleteAssessmentParameter.fulfilled, (state) => {
+        state.loading = false;
+        state.isDeleteDialogOpen = false;
+        state.selectedItem = null;
+      })
+      .addCase(deleteAssessmentParameter.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.error.message || "Failed to delete record";
       });
   },
 });
 
-export const { setAddDialogOpen, clearError } = assessmentSlice.actions;
+export const {
+  setAddDialogOpen,
+  setEditDialogOpen,
+  setDeleteDialogOpen,
+  setSelectedItem,
+  clearError,
+} = assessmentSlice.actions;
+
 export default assessmentSlice.reducer;

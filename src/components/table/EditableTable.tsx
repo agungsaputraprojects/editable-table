@@ -4,8 +4,16 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Plus, Eye, Pencil, Trash2 } from "lucide-react";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
-import { fetchAllData, setAddDialogOpen } from "@/store/slices/assessmentSlice";
+import {
+  fetchAllData,
+  setAddDialogOpen,
+  setEditDialogOpen,
+  setDeleteDialogOpen,
+  setSelectedItem,
+} from "@/store/slices/assessmentSlice";
 import { AddAssessmentDialog } from "@/components/dialogs/AddAssessmentDialog";
+import { EditAssessmentDialog } from "@/components/dialogs/EditAssessmentDialog";
+import { DeleteDialog } from "@/components/dialogs/DeleteDialog";
 import { EditableCell } from "@/components/table/EditableCell";
 import {
   Select,
@@ -33,17 +41,17 @@ export default function EditableTable() {
 
   const handleView = (row: DisplayData) => {
     console.log("View row:", row);
-    // TODO: Implement view details
+    // TODO: Implement view details modal
   };
 
   const handleEdit = (row: DisplayData) => {
-    console.log("Edit row:", row);
-    // TODO: Implement edit dialog
+    dispatch(setSelectedItem(row));
+    dispatch(setEditDialogOpen(true));
   };
 
   const handleDelete = (row: DisplayData) => {
-    console.log("Delete row:", row);
-    // TODO: Implement delete confirmation
+    dispatch(setSelectedItem(row));
+    dispatch(setDeleteDialogOpen(true));
   };
 
   const getStatusColor = (status: FulfilmentStatusType) => {
@@ -77,7 +85,6 @@ export default function EditableTable() {
 
   return (
     <div className="space-y-4">
-      {/* Header with Add Button */}
       <div className="flex justify-end">
         <Button
           onClick={handleAddNew}
@@ -88,7 +95,6 @@ export default function EditableTable() {
         </Button>
       </div>
 
-      {/* Search and Filter */}
       <div className="flex gap-4">
         <div className="flex-1">
           <Input
@@ -111,12 +117,10 @@ export default function EditableTable() {
         </Select>
       </div>
 
-      {/* Records Count */}
       <div className="text-sm text-gray-600">
         Showing {data.length} of {data.length} records
       </div>
 
-      {/* Table with Horizontal Scroll */}
       <div className="border rounded-lg overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
@@ -146,7 +150,8 @@ export default function EditableTable() {
                     colSpan={5}
                     className="px-4 py-8 text-center text-gray-500"
                   >
-                    No data available. Click "Add New" to create a record.
+                    No data available. Click &quot;Add New&quot; to create a
+                    record.
                   </td>
                 </tr>
               ) : (
@@ -157,7 +162,6 @@ export default function EditableTable() {
                       index % 2 === 0 ? "bg-white" : "bg-gray-50"
                     }`}
                   >
-                    {/* Subject */}
                     <td className="px-4 py-3">
                       <div className="space-y-1">
                         <div className="font-medium text-gray-900">
@@ -176,37 +180,31 @@ export default function EditableTable() {
                       </div>
                     </td>
 
-                    {/* Target */}
                     <td className="px-4 py-3">
                       <EditableCell
                         value={row.Target || ""}
                         onSave={(newValue) => {
                           console.log("Update target:", row.Id, newValue);
-                          // TODO: Dispatch update action
                         }}
                         placeholder="Click to edit target..."
                       />
                     </td>
 
-                    {/* Actual */}
                     <td className="px-4 py-3">
                       <EditableCell
                         value={row.Actual || ""}
                         onSave={(newValue) => {
                           console.log("Update actual:", row.Id, newValue);
-                          // TODO: Dispatch update action
                         }}
                         placeholder="Click to edit actual..."
                       />
                     </td>
 
-                    {/* Status */}
                     <td className="px-4 py-3">
                       <Select
                         value={row.FulfilmentStatus || ""}
                         onValueChange={(value: FulfilmentStatusType) => {
                           console.log("Update status:", row.Id, value);
-                          // TODO: Dispatch update action
                         }}
                       >
                         <SelectTrigger
@@ -226,7 +224,6 @@ export default function EditableTable() {
                       </Select>
                     </td>
 
-                    {/* Actions */}
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         <Button
@@ -234,6 +231,7 @@ export default function EditableTable() {
                           size="icon"
                           onClick={() => handleView(row)}
                           className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                          aria-label="View details"
                         >
                           <Eye className="h-4 w-4" />
                         </Button>
@@ -242,6 +240,7 @@ export default function EditableTable() {
                           size="icon"
                           onClick={() => handleEdit(row)}
                           className="h-8 w-8 text-gray-600 hover:text-gray-700 hover:bg-gray-100"
+                          aria-label="Edit record"
                         >
                           <Pencil className="h-4 w-4" />
                         </Button>
@@ -250,6 +249,7 @@ export default function EditableTable() {
                           size="icon"
                           onClick={() => handleDelete(row)}
                           className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
+                          aria-label="Delete record"
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -264,6 +264,8 @@ export default function EditableTable() {
       </div>
 
       <AddAssessmentDialog />
+      <EditAssessmentDialog />
+      <DeleteDialog />
     </div>
   );
 }
