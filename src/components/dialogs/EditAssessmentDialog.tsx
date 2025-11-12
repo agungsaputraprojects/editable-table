@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2 } from "lucide-react";
+import { Combobox } from "@/components/ui/combobox";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import {
   setEditDialogOpen,
@@ -30,20 +31,14 @@ import type { FulfilmentStatusType } from "@/types/nocodb";
 
 export function EditAssessmentDialog() {
   const dispatch = useAppDispatch();
-  const {
-    isEditDialogOpen,
-    selectedItem,
-    subjectOptions,
-    assessmentOptions,
-    loading,
-  } = useAppSelector((state) => state.assessment);
+  const { isEditDialogOpen, selectedItem, subjectOptions, loading } =
+    useAppSelector((state) => state.assessment);
 
   const [formData, setFormData] = useState({
     SubjectId: undefined as number | undefined,
     Actual: "",
     Target: "",
     FulfilmentStatus: "" as FulfilmentStatusType,
-    AssessmentId: undefined as number | undefined,
   });
 
   useEffect(() => {
@@ -53,7 +48,6 @@ export function EditAssessmentDialog() {
         Actual: selectedItem.Actual || "",
         Target: selectedItem.Target || "",
         FulfilmentStatus: selectedItem.FulfilmentStatus || "",
-        AssessmentId: selectedItem.AssessmentId,
       });
     }
   }, [selectedItem]);
@@ -96,6 +90,12 @@ export function EditAssessmentDialog() {
     dispatch(setEditDialogOpen(false));
   };
 
+  // Transform options for Combobox (without subtitle)
+  const subjectComboboxOptions = subjectOptions.map((subject) => ({
+    value: subject.Id!.toString(),
+    label: subject.Title || subject.Validate || `Subject ${subject.Id}`,
+  }));
+
   if (!selectedItem) return null;
 
   return (
@@ -110,34 +110,24 @@ export function EditAssessmentDialog() {
 
         <form onSubmit={handleSubmit}>
           <div className="grid gap-4 py-4">
-            {/* Subject Dropdown */}
+            {/* Subject Combobox */}
             <div className="grid gap-2">
               <Label htmlFor="subject">
                 Subject <span className="text-red-500">*</span>
               </Label>
-              <Select
+              <Combobox
+                options={subjectComboboxOptions}
                 value={formData.SubjectId?.toString()}
                 onValueChange={(value) =>
                   setFormData((prev) => ({
                     ...prev,
-                    SubjectId: parseInt(value),
+                    SubjectId: value ? parseInt(value) : undefined,
                   }))
                 }
-                required
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select subject..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {subjectOptions.map((subject) => (
-                    <SelectItem key={subject.Id} value={subject.Id!.toString()}>
-                      {subject.Title ||
-                        subject.Validate ||
-                        `Subject ${subject.Id}`}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                placeholder="Select subject..."
+                searchPlaceholder="Search subjects..."
+                emptyText="No subject found."
+              />
             </div>
 
             {/* Target */}
@@ -185,34 +175,6 @@ export function EditAssessmentDialog() {
                   <SelectItem value="Fully Met">Fully Met</SelectItem>
                   <SelectItem value="Partially Met">Partially Met</SelectItem>
                   <SelectItem value="Not Met">Not Met</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Assessment Dropdown */}
-            <div className="grid gap-2">
-              <Label htmlFor="assessment">Assessment</Label>
-              <Select
-                value={formData.AssessmentId?.toString()}
-                onValueChange={(value) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    AssessmentId: parseInt(value),
-                  }))
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select assessment..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {assessmentOptions.map((assessment) => (
-                    <SelectItem
-                      key={assessment.Id}
-                      value={assessment.Id!.toString()}
-                    >
-                      {assessment.Title || `Assessment ${assessment.Id}`}
-                    </SelectItem>
-                  ))}
                 </SelectContent>
               </Select>
             </div>
